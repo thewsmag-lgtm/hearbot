@@ -11,7 +11,7 @@ POSTING_KEY = os.getenv("HIVE_POSTING_KEY", "test_key")
 TOKEN = os.getenv("TOKEN", "DEC")
 TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "1"))
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "30"))
-MIN_SPREAD_PERCENT = float(os.getenv("MIN_SPREAD", "5.0"))  # Minimum %5 spread
+TICK_SIZE = float(os.getenv("TICK_SIZE", "0.00000001"))  # Fiyat adımı
 
 # Hive Engine API
 HE_API = "https://api.hive-engine.com/rpc/contracts"
@@ -34,7 +34,6 @@ def safe_parse(value):
 def get_order_book(token):
     """Hive Engine order book'u çek"""
     try:
-        # Satış emirleri (ASK)
         sell_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 1,
@@ -47,7 +46,6 @@ def get_order_book(token):
             }
         }, timeout=10).json()
         
-        # Alış emirleri (BID)
         buy_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 2,
@@ -64,22 +62,20 @@ def get_order_book(token):
         buy_orders = buy_response.get("result", [])
         
         if not sell_orders or not buy_orders:
-            return None, None, [], []
+            return None, None
         
-        # En düşük satış fiyatı (best ASK)
         best_ask = min([safe_parse(o["price"]) for o in sell_orders if safe_parse(o["price"])])
-        # En yüksek alış fiyatı (best BID)
         best_bid = max([safe_parse(o["price"]) for o in buy_orders if safe_parse(o["price"])])
         
-        return best_ask, best_bid, sell_orders, buy_orders
+        return best_ask, best_bid
     except Exception as e:
         log(f"Order book hatası: {e}", "ERROR")
-        return None, None, [], []
+        return None, None
 
 def place_buy_order(token, price, quantity):
-    """Alım emri koy"""
-    log(f" ALIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
-    # Gerçek işlem için:
+    """Alım emri koy (SİMÜLASYON)"""
+    log(f"📈 ALIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
+    # Gerçek işlem için bu kısmı aç:
     # payload = {
     #     "contractName": "market",
     #     "contractAction": "buy",
@@ -93,9 +89,9 @@ def place_buy_order(token, price, quantity):
     return True
 
 def place_sell_order(token, price, quantity):
-    """Satım emri koy"""
+    """Satım emri koy (SİMÜLASYON)"""
     log(f"📉 SATIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
-    # Gerçek işlem için:
+    # Gerçek işlem için bu kısmı aç:
     # payload = {
     #     "contractName": "market",
     #     "contractAction": "sell",
@@ -111,14 +107,14 @@ def place_sell_order(token, price, quantity):
 def run_bot():
     """Ana bot döngüsü"""
     log("=" * 60, "INFO")
-    log("🤖 Hive Engine Market Making Botu", "INFO")
+    log("🤖 Hive Engine Top-of-Book Botu", "INFO")
     log(f"Kullanıcı: {HIVE_USERNAME}", "INFO")
     log(f"Token: {TOKEN}", "INFO")
     log(f"İşlem miktarı: {TRADE_AMOUNT_HIVE} HIVE", "INFO")
-    log(f"Minimum spread: %{MIN_SPREAD_PERCENT}", "INFO")
+    log(f"Fiyat adımı (tick): {TICK_SIZE}", "INFO")
     log(f"Kontrol aralığı: {CHECK_INTERVAL} saniye", "INFO")
     log("=" * 60, "INFO")
-    log("⚠️  SİMÜLASYON MODU", "WARNING")
+    log("⚠️  SİMÜLASYON MODU - Gerçek emir koyulmuyor!", "WARNING")
     log("=" * 60, "INFO")
     
     cycle = 0
@@ -130,45 +126,39 @@ def run_bot():
             log(f"\n🔄 Döngü #{cycle}", "INFO")
             
             # Order book çek
-            best_ask, best_bid, sell_orders, buy_orders = get_order_book(TOKEN)
+            best_ask, best_bid = get_order_book(TOKEN)
             
             if not best_ask or not best_bid:
-                log("⚠️  Order book boş", "WARNING")
+                log("⚠️  Order book boş, bekleniyor...", "WARNING")
                 time.sleep(CHECK_INTERVAL)
                 continue
             
-            # Spread hesapla
-            spread = ((best_ask - best_bid) / best_bid) * 100
-            
-            log(f"📊 Order Book:", "INFO")
+            log(f"📊 Mevcut Order Book:", "INFO")
             log(f"   Best ASK: {best_ask:.8f}", "INFO")
             log(f"   Best BID: {best_bid:.8f}", "INFO")
-            log(f"   Spread: %{spread:.2f}", "INFO")
+            log(f"   Spread: %{((best_ask - best_bid) / best_bid * 100):.2f}", "INFO")
             
-            # Spread yeterince büyükse emir koy
-            if spread >= MIN_SPREAD_PERCENT:
-                orders_placed += 1
-                log(f"\n💰 Spread yeterli! (%{spread:.2f} >= %{MIN_SPREAD_PERCENT})", "SUCCESS")
-                
-                # DEC miktarını hesapla
-                dec_quantity = TRADE_AMOUNT_HIVE / best_ask
-                
-                # Alım emri: Best BID'in %1 üstüne koy (daha rekabetçi)
-                buy_price = best_bid * 1.01
-                log(f"   Alım fiyatı: {buy_price:.8f} (BID + %1)", "INFO")
-                place_buy_order(TOKEN, buy_price, dec_quantity)
-                
-                # Satım emri: Best ASK'ın %1 altına koy (daha rekabetçi)
-                sell_price = best_ask * 0.99
-                log(f"   Satım fiyatı: {sell_price:.8f} (ASK - %1)", "INFO")
-                place_sell_order(TOKEN, sell_price, dec_quantity)
-                
-                # Beklenen kâr
-                profit = (sell_price - buy_price) * dec_quantity
-                log(f"   Beklenen kâr: {profit:.6f} HIVE", "INFO")
-                log(f"   Toplam emir: {orders_placed}", "INFO")
-            else:
-                log(f"️  Spread yetersiz (%{spread:.2f} < %{MIN_SPREAD_PERCENT})", "INFO")
+            # DEC miktarını hesapla
+            dec_quantity = TRADE_AMOUNT_HIVE / best_ask
+            
+            # ALIŞ EMRİ: Best BID'in üzerine koy (bir tick yukarı)
+            # Böylece en üstte durur, ilk eşleşen olur
+            buy_price = best_bid + TICK_SIZE
+            log(f"\n📈 Alım emri koyulacak: {buy_price:.8f} (BID + {TICK_SIZE})", "INFO")
+            place_buy_order(TOKEN, buy_price, dec_quantity)
+            
+            # SATIŞ EMRİ: Best ASK'ın altına koy (bir tick aşağı)
+            # Böylece en üstte durur, ilk eşleşen olur
+            sell_price = best_ask - TICK_SIZE
+            log(f"📉 Satım emri koyulacak: {sell_price:.8f} (ASK - {TICK_SIZE})", "INFO")
+            place_sell_order(TOKEN, sell_price, dec_quantity)
+            
+            orders_placed += 2
+            log(f"   Toplam emir sayısı: {orders_placed}", "INFO")
+            
+            # Beklenen kâr (eğer her iki emir de dolarsa)
+            profit = (sell_price - buy_price) * dec_quantity
+            log(f"   Beklenen kâr (her iki emir dolarsa): {profit:.6f} HIVE", "INFO")
             
             log(f"\n {CHECK_INTERVAL} saniye bekleniyor...", "INFO")
             time.sleep(CHECK_INTERVAL)
