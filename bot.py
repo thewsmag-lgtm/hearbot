@@ -8,7 +8,6 @@ from beem import Hive
 
 # --- AYARLAR ---
 HIVE_USERNAME = os.getenv("HIVE_USERNAME", "test_user")
-# ⚠️ KRİTİK DEĞİŞİKLİK: Market işlemleri için ACTIVE KEY gereklidir!
 HIVE_ACTIVE_KEY = os.getenv("HIVE_ACTIVE_KEY", "test_active_key") 
 TOKEN = os.getenv("TOKEN", "DEC")
 TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "0.1"))
@@ -31,7 +30,7 @@ def safe_parse(value):
     except:
         return None
 
-def get_balance(token):
+def get_balance(token_symbol):
     """Hive-Engine bakiyesini kontrol et"""
     try:
         response = requests.post(HE_API, json={
@@ -41,7 +40,7 @@ def get_balance(token):
             "params": {
                 "contract": "tokens",
                 "table": "balances",
-                "query": {"account": HIVE_USERNAME, "symbol": token},
+                "query": {"account": HIVE_USERNAME, "symbol": token_symbol},
                 "limit": 1
             }
         }, timeout=10).json()
@@ -102,17 +101,15 @@ def get_my_open_orders(token):
 def send_custom_json(payload):
     """Hive-Engine'e Custom JSON gönder - ACTIVE KEY ile"""
     try:
-        # ⚠️ KRİTİK: Active Key kullanılıyor
         hive = Hive(node=HIVE_NODE, keys=[HIVE_ACTIVE_KEY])
-        
         result = hive.custom_json(
             id="ssc-mainnet1",
             json_data=json.dumps(payload),
-            required_auths=[HIVE_USERNAME]  # ⚠️ KRİTİK: required_auths (Active) kullanılıyor, posting_auths DEĞİL
+            required_auths=[HIVE_USERNAME]  # Active Key yetkisi
         )
         return result
     except Exception as e:
-        log(f"İşlem gönderilemedi (Active Key hatası olabilir): {e}", "ERROR")
+        log(f"İşlem gönderilemedi: {e}", "ERROR")
         return None
 
 def cancel_order(order_id):
@@ -140,7 +137,7 @@ def cancel_all_my_orders(token):
         if order_id:
             cancel_order(order_id)
             cancelled += 1
-            time.sleep(1.5) # Rate limit için güvenli bekleme
+            time.sleep(1.5)
     return cancelled
 
 def place_buy_order(token, price, quantity):
@@ -150,7 +147,7 @@ def place_buy_order(token, price, quantity):
         "contractAction": "buy",
         "contractPayload": {
             "symbol": token,
-            "quantity": f"{quantity:.8f}", # String formatı garantilendi
+            "quantity": f"{quantity:.8f}",
             "price": f"{price:.8f}"
         }
     }
@@ -180,16 +177,17 @@ def run_bot():
     log("🤖 Hive-Engine Market Botu (ACTIVE KEY & BAKİYE KONTROLLÜ)", "INFO")
     log(f"Kullanıcı: {HIVE_USERNAME}", "INFO")
     log(f"Token: {TOKEN}", "INFO")
-    log(f"İşlem miktarı: {TRADE_AMOUNT_HIVE} HIVE", "INFO")
+    log(f"İşlem miktarı: {TRADE_AMOUNT_HIVE} SWAP.HIVE", "INFO")
     log("=" * 70, "INFO")
     
-    # Başlangıç bakiye kontrolü
-    hive_bal = get_balance("HIVE")
+    # ⚠️ KRİTİK DÜZELTME: "HIVE" yerine "SWAP.HIVE" kontrol ediliyor
+    swap_hive_bal = get_balance("SWAP.HIVE")
     token_bal = get_balance(TOKEN)
-    log(f"💰 Başlangıç Bakiyesi: {hive_bal:.4f} HIVE | {token_bal:.4f} {TOKEN}", "INFO")
     
-    if hive_bal < TRADE_AMOUNT_HIVE:
-        log(f"❌ YETERSİZ BAKİYE: En az {TRADE_AMOUNT_HIVE} HIVE gerekli!", "ERROR")
+    log(f"💰 Başlangıç Bakiyesi: {swap_hive_bal:.4f} SWAP.HIVE | {token_bal:.4f} {TOKEN}", "INFO")
+    
+    if swap_hive_bal < TRADE_AMOUNT_HIVE:
+        log(f"❌ YETERSİZ BAKİYE: En az {TRADE_AMOUNT_HIVE} SWAP.HIVE gerekli!", "ERROR")
         return
 
     cycle = 0
@@ -214,10 +212,10 @@ def run_bot():
             
             dec_quantity = TRADE_AMOUNT_HIVE / best_ask
             
-            # Güncel bakiyeyi tekrar kontrol et (emirler dolmuş olabilir)
-            current_hive_bal = get_balance("HIVE")
-            if current_hive_bal < TRADE_AMOUNT_HIVE:
-                log("⚠️ HIVE bakiyesi yetersiz, emir koyulamıyor.", "WARNING")
+            # Her döngüde SWAP.HIVE bakiyesini tekrar kontrol et
+            current_swap_hive_bal = get_balance("SWAP.HIVE")
+            if current_swap_hive_bal < TRADE_AMOUNT_HIVE:
+                log("⚠️ SWAP.HIVE bakiyesi yetersiz, emir koyulamıyor.", "WARNING")
                 time.sleep(CHECK_INTERVAL)
                 continue
 
