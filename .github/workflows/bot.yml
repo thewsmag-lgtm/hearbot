@@ -1,7 +1,7 @@
 name: DEC Arbitrage Bot
 
 on:
-  workflow_dispatch:  # Manuel çalıştırma için
+  workflow_dispatch:
 
 jobs:
   run-bot:
@@ -17,7 +17,7 @@ jobs:
       - name: Install dependencies
         run: pip install requests
       
-      - name: Run Bot (Simülasyon)
+      - name: Run Bot
         env:
           HIVE_USERNAME: ${{ secrets.HIVE_USERNAME }}
           HIVE_POSTING_KEY: ${{ secrets.HIVE_POSTING_KEY }}
@@ -25,5 +25,5 @@ jobs:
           CHECK_INTERVAL: ${{ secrets.CHECK_INTERVAL }}
           MIN_SPREAD: ${{ secrets.MIN_SPREAD }}
         run: |
-          echo "🚀 Bot başlatılıyor (Simülasyon Modu)..."
+          echo "🚀 Bot başlatılıyor..."
           python -u bot.py
