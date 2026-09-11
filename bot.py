@@ -1,30 +1,31 @@
 import os
+import sys
 import time
 import json
 import requests
 from datetime import datetime
 
 # --- AYARLAR ---
-HIVE_USERNAME = os.getenv("HIVE_USERNAME")
-POSTING_KEY = os.getenv("HIVE_POSTING_KEY")
-TOKEN = "DEC"
-TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "1"))  # Varsayılan 1 HIVE
-CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "30"))  # Varsayılan 30 saniye
-MIN_SPREAD = float(os.getenv("MIN_SPREAD", "3.0"))  # Minimum %3 spread
+HIVE_USERNAME = os.getenv("HIVE_USERNAME", "test_user")
+POSTING_KEY = os.getenv("HIVE_POSTING_KEY", "test_key")
+TOKEN = os.getenv("TOKEN", "DEC")
+TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "1"))
+CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "30"))
+MIN_SPREAD = float(os.getenv("MIN_SPREAD", "3.0"))
 
 # Hive Engine API
 HE_API = "https://api.hive-engine.com/rpc/contracts"
-HIVE_API = "https://api.hive-engine.com/rpc"
 
 def log(message, level="INFO"):
-    """Log mesajı"""
+    """Anlık log mesajı"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] [{level}] {message}")
+    sys.stdout.flush()  # Anlık gösterim için
 
 def get_order_book(token):
     """Order book'u çek"""
     try:
-        # Sell book
+        # Sell book (satış emirleri)
         sell_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 1,
@@ -37,7 +38,7 @@ def get_order_book(token):
             }
         }, timeout=10).json()
         
-        # Buy book
+        # Buy book (alış emirleri)
         buy_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 2,
@@ -65,14 +66,11 @@ def get_order_book(token):
         return None, None, [], []
 
 def send_custom_json(payload):
-    """Hive Engine'e Custom JSON gönder"""
-    # Bu kısım Hive Engine'in kendi API'sini kullanır
-    # Gerçek işlem için Hive blockchain üzerinde Custom JSON gerekir
-    # Şimdilik sadece simülasyon
+    """Hive Engine'e Custom JSON gönder (SİMÜLASYON)"""
+    log(f" İşlem gönderilecek:", "INFO")
+    log(f"   {json.dumps(payload, indent=2)}", "INFO")
     
-    log(f"İşlem gönderilecek: {json.dumps(payload, indent=2)}", "INFO")
-    
-    # GERÇEK İŞLEM İÇİN BU KISIM AÇILMALI:
+    # ⚠️ GERÇEK İŞLEM İÇİN BU KISMI AÇ:
     # from beem import Hive
     # from beembase.operations import CustomJson
     # from beem.transactionbuilder import TransactionBuilder
@@ -88,8 +86,10 @@ def send_custom_json(payload):
     # tx.appendWif(POSTING_KEY)
     # tx.sign()
     # result = tx.broadcast()
+    # log(f"✅ İşlem gönderildi: {result}", "SUCCESS")
     # return result
     
+    log("️  SİMÜLASYON: Gerçek işlem yapılmadı", "WARNING")
     return {"simulated": True}
 
 def place_buy_order(token, price, quantity):
@@ -120,60 +120,69 @@ def place_sell_order(token, price, quantity):
 
 def run_bot():
     """Ana bot döngüsü"""
-    log("=" * 60)
+    log("=" * 60, "INFO")
     log("DEC Arbitraj Botu Başlatıldı", "INFO")
     log(f"Kullanıcı: {HIVE_USERNAME}", "INFO")
+    log(f"Token: {TOKEN}", "INFO")
     log(f"İşlem miktarı: {TRADE_AMOUNT_HIVE} HIVE", "INFO")
     log(f"Minimum spread: %{MIN_SPREAD}", "INFO")
     log(f"Kontrol aralığı: {CHECK_INTERVAL} saniye", "INFO")
-    log("=" * 60)
+    log("=" * 60, "INFO")
     log("⚠️  SİMÜLASYON MODU - Gerçek işlem yapılmıyor!", "WARNING")
-    log("Gerçek işlem için kodda yorum satırlarını kaldır", "WARNING")
-    log("=" * 60)
+    log("Gerçek işlem için bot.py'de yorum satırlarını kaldır", "WARNING")
+    log("=" * 60, "INFO")
     
+    cycle = 0
     while True:
         try:
+            cycle += 1
+            log(f"\n🔄 Döngü #{cycle} başlıyor...", "INFO")
+            
             # Order book çek
             best_ask, best_bid, sell_orders, buy_orders = get_order_book(TOKEN)
             
             if not best_ask or not best_bid:
-                log("Order book boş, bekleniyor...", "WARNING")
+                log("⚠️  Order book boş, bekleniyor...", "WARNING")
                 time.sleep(CHECK_INTERVAL)
                 continue
             
             spread = ((best_ask - best_bid) / best_bid) * 100
             
-            log(f"Order Book: ASK={best_ask:.8f}, BID={best_bid:.8f}, Spread=%{spread:.2f}", "INFO")
+            log(f"📊 Order Book:", "INFO")
+            log(f"   Best ASK (en düşük satış): {best_ask:.8f}", "INFO")
+            log(f"   Best BID (en yüksek alış): {best_bid:.8f}", "INFO")
+            log(f"   Spread: %{spread:.2f}", "INFO")
             
             # Spread kontrolü
             if spread >= MIN_SPREAD:
-                log(f"💰 Arbitraj fırsatı! Spread: %{spread:.2f}", "SUCCESS")
+                log(f"\n💰 ARBITRAJ FIRSATI! Spread: %{spread:.2f}", "SUCCESS")
                 
                 # DEC miktarı hesapla
                 dec_quantity = TRADE_AMOUNT_HIVE / best_ask
                 
-                # Alım emri (best ask'in %0.5 üstü)
+                # Alım emri (best ask'in %0.5 üstü - hızlı dolması için)
                 buy_price = best_ask * 1.005
-                log(f"Alım: {dec_quantity:.4f} {TOKEN} @ {buy_price:.8f}", "INFO")
+                log(f"📈 Alım emri: {dec_quantity:.4f} {TOKEN} @ {buy_price:.8f}", "INFO")
                 place_buy_order(TOKEN, buy_price, dec_quantity)
                 
-                # Satım emri (best bid'in %0.5 altı)
+                # Satım emri (best bid'in %0.5 altı - hızlı dolması için)
                 sell_price = best_bid * 0.995
-                log(f"Satım: {dec_quantity:.4f} {TOKEN} @ {sell_price:.8f}", "INFO")
+                log(f"📉 Satım emri: {dec_quantity:.4f} {TOKEN} @ {sell_price:.8f}", "INFO")
                 place_sell_order(TOKEN, sell_price, dec_quantity)
                 
                 beklenen_kar = (sell_price - buy_price) * dec_quantity
-                log(f"Beklenen kâr: {beklenen_kar:.6f} HIVE", "INFO")
+                log(f" Beklenen kâr: {beklenen_kar:.6f} HIVE", "INFO")
             else:
-                log(f"Spread yetersiz (%{spread:.2f} < %{MIN_SPREAD})", "INFO")
+                log(f"️  Spread yetersiz (%{spread:.2f} < %{MIN_SPREAD})", "INFO")
             
+            log(f"\n⏳ {CHECK_INTERVAL} saniye bekleniyor...", "INFO")
             time.sleep(CHECK_INTERVAL)
             
         except KeyboardInterrupt:
-            log("Bot durduruldu", "INFO")
+            log("\n🛑 Bot durduruldu", "INFO")
             break
         except Exception as e:
-            log(f"Hata: {e}", "ERROR")
+            log(f"\n❌ HATA: {e}", "ERROR")
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
