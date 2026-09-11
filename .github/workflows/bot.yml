@@ -1,4 +1,4 @@
-name: DEC Arbitrage Bot
+name: DEC Market Making Bot
 
 on:
   workflow_dispatch:
@@ -25,5 +25,5 @@ jobs:
           CHECK_INTERVAL: ${{ secrets.CHECK_INTERVAL }}
           MIN_SPREAD: ${{ secrets.MIN_SPREAD }}
         run: |
-          echo "🚀 Bot başlatılıyor..."
+          echo "🚀 Market Making Bot başlatılıyor..."
           python -u bot.py
