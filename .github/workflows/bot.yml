@@ -17,7 +17,7 @@ jobs:
       - name: Install dependencies
         run: pip install requests
       
-      - name: Run Bot (5 dakika)
+      - name: Run Bot (Simülasyon)
         env:
           HIVE_USERNAME: ${{ secrets.HIVE_USERNAME }}
           HIVE_POSTING_KEY: ${{ secrets.HIVE_POSTING_KEY }}
@@ -25,4 +25,5 @@ jobs:
           CHECK_INTERVAL: ${{ secrets.CHECK_INTERVAL }}
           MIN_SPREAD: ${{ secrets.MIN_SPREAD }}
         run: |
-          timeout 300 python bot.py || true
+          echo "🚀 Bot başlatılıyor (Simülasyon Modu)..."
+          python -u bot.py
