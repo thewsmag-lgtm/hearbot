@@ -1,0 +1,28 @@
+name: DEC Arbitrage Bot
+
+on:
+  workflow_dispatch:  # Manuel çalıştırma için
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: Run Bot (5 dakika)
+        env:
+          HIVE_USERNAME: ${{ secrets.HIVE_USERNAME }}
+          HIVE_POSTING_KEY: ${{ secrets.HIVE_POSTING_KEY }}
+          TRADE_AMOUNT: ${{ secrets.TRADE_AMOUNT }}
+          CHECK_INTERVAL: ${{ secrets.CHECK_INTERVAL }}
+          MIN_SPREAD: ${{ secrets.MIN_SPREAD }}
+        run: |
+          timeout 300 python bot.py || true
