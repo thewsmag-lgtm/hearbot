@@ -86,12 +86,16 @@ def get_my_open_orders(token):
             "params": {"contract": "market", "table": "buyBook", "query": {"account": HIVE_USERNAME, "symbol": token}, "limit": 1000}
         }, timeout=10).json()
         open_buys = buy_response.get("result") or []
+        for order in open_buys:
+            order["_type"] = "buy" # KRİTİK DÜZELTME
         
         sell_response = requests.post(HE_API, json={
             "jsonrpc": "2.0", "id": 11, "method": "find",
             "params": {"contract": "market", "table": "sellBook", "query": {"account": HIVE_USERNAME, "symbol": token}, "limit": 1000}
         }, timeout=10).json()
         open_sells = sell_response.get("result") or []
+        for order in open_sells:
+            order["_type"] = "sell" # KRİTİK DÜZELTME
         
         return open_buys + open_sells
     except Exception as e:
@@ -99,26 +103,48 @@ def get_my_open_orders(token):
         return []
 
 def send_custom_json(payload):
-    """Hive-Engine'e Custom JSON gönder - ACTIVE KEY ile"""
+    """Hive-Engine'e Custom JSON gönder - DOĞRU ID ile"""
     try:
         hive = Hive(node=HIVE_NODE, keys=[HIVE_ACTIVE_KEY])
+        
+        # KRİTİK DÜZELTME: Payload ve sonucu logla
+        log(f"📤 Gönderilen payload: {json.dumps(payload)}", "INFO")
+        
         result = hive.custom_json(
-            id="ssc-mainnet1",
+            id="ssc-mainnet-hive",  # KRİTİK DÜZELTME: Doğru ID
             json_data=json.dumps(payload),
-            required_auths=[HIVE_USERNAME]  # Active Key yetkisi
+            required_auths=[HIVE_USERNAME]
         )
+        
+        log(f"📦 Blockchain sonucu: {result}", "INFO")
         return result
+
     except Exception as e:
-        log(f"İşlem gönderilemedi: {e}", "ERROR")
+        log(f"❌ İşlem gönderilemedi: {e}", "ERROR")
         return None
 
-def cancel_order(order_id):
-    log(f"   🗑️ Emir iptal ediliyor: {order_id}", "INFO")
+def cancel_order(order):
+    order_id = order.get("_id") or order.get("id")
+    if not order_id:
+        return None
+
+    order_type = order.get("_type")
+    if order_type not in ["buy", "sell"]:
+        log(f"⚠️ Emir tipi belirlenemedi: {order}", "WARNING")
+        return None
+
+    log(f"🗑️ Emir iptal ediliyor: {order_type.upper()} / {order_id}", "INFO")
+
+    # KRİTİK DÜZELTME: Cancel payload'ına 'type' eklendi
     payload = {
         "contractName": "market",
         "contractAction": "cancel",
-        "contractPayload": {"id": str(order_id)}
+        "contractPayload": {
+            "type": order_type,
+            "id": str(order_id)
+        }
     }
+
     result = send_custom_json(payload)
     if result:
         log(f"   ✅ Emir iptal edildi", "SUCCESS")
@@ -133,9 +159,7 @@ def cancel_all_my_orders(token):
     log(f"   🧹 {len(open_orders)} açık emir bulundu, iptal ediliyor...", "INFO")
     cancelled = 0
     for order in open_orders:
-        order_id = order.get("_id") or order.get("id")
-        if order_id:
-            cancel_order(order_id)
+        if cancel_order(order):
             cancelled += 1
             time.sleep(1.5)
     return cancelled
@@ -153,7 +177,7 @@ def place_buy_order(token, price, quantity):
     }
     result = send_custom_json(payload)
     if result:
-        log(f"   ✅ Alım emri blockchain'e gönderildi", "SUCCESS")
+        log("✅ Custom JSON Hive blockchain'e yayınlandı; market sonucu henüz doğrulanmadı.", "INFO")
     return result
 
 def place_sell_order(token, price, quantity):
@@ -169,18 +193,17 @@ def place_sell_order(token, price, quantity):
     }
     result = send_custom_json(payload)
     if result:
-        log(f"   ✅ Satım emri blockchain'e gönderildi", "SUCCESS")
+        log("✅ Custom JSON Hive blockchain'e yayınlandı; market sonucu henüz doğrulanmadı.", "INFO")
     return result
 
 def run_bot():
     log("=" * 70, "INFO")
-    log("🤖 Hive-Engine Market Botu (ACTIVE KEY & BAKİYE KONTROLLÜ)", "INFO")
+    log("🤖 Hive-Engine Market Botu (NİHAİ DÜZELTMELER)", "INFO")
     log(f"Kullanıcı: {HIVE_USERNAME}", "INFO")
     log(f"Token: {TOKEN}", "INFO")
     log(f"İşlem miktarı: {TRADE_AMOUNT_HIVE} SWAP.HIVE", "INFO")
     log("=" * 70, "INFO")
     
-    # ⚠️ KRİTİK DÜZELTME: "HIVE" yerine "SWAP.HIVE" kontrol ediliyor
     swap_hive_bal = get_balance("SWAP.HIVE")
     token_bal = get_balance(TOKEN)
     
@@ -212,20 +235,23 @@ def run_bot():
             
             dec_quantity = TRADE_AMOUNT_HIVE / best_ask
             
-            # Her döngüde SWAP.HIVE bakiyesini tekrar kontrol et
+            # 1. Alım için SWAP.HIVE kontrolü
             current_swap_hive_bal = get_balance("SWAP.HIVE")
             if current_swap_hive_bal < TRADE_AMOUNT_HIVE:
-                log("⚠️ SWAP.HIVE bakiyesi yetersiz, emir koyulamıyor.", "WARNING")
-                time.sleep(CHECK_INTERVAL)
-                continue
+                log("⚠️ SWAP.HIVE bakiyesi yetersiz, alım emri koyulamıyor.", "WARNING")
+            else:
+                buy_price = best_bid + TICK_SIZE
+                place_buy_order(TOKEN, buy_price, dec_quantity)
+                orders_placed += 1
 
-            buy_price = best_bid + TICK_SIZE
-            place_buy_order(TOKEN, buy_price, dec_quantity)
-            
-            sell_price = best_ask - TICK_SIZE
-            place_sell_order(TOKEN, sell_price, dec_quantity)
-            
-            orders_placed += 2
+            # 2. Satım için TOKEN (DEC) kontrolü (KRİTİK DÜZELTME)
+            current_token_bal = get_balance(TOKEN)
+            if current_token_bal < dec_quantity:
+                log(f"⚠️ {TOKEN} bakiyesi yetersiz. Gerekli: {dec_quantity:.4f}, Mevcut: {current_token_bal:.4f}", "WARNING")
+            else:
+                sell_price = best_ask - TICK_SIZE
+                place_sell_order(TOKEN, sell_price, dec_quantity)
+                orders_placed += 1
             
             log(f"⏳ {CHECK_INTERVAL} saniye bekleniyor...", "INFO")
             time.sleep(CHECK_INTERVAL)
