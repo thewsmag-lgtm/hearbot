@@ -58,8 +58,8 @@ def get_order_book(token):
             }
         }, timeout=10).json()
         
-        sell_orders = sell_response.get("result", [])
-        buy_orders = buy_response.get("result", [])
+        sell_orders = sell_response.get("result") or []
+        buy_orders = buy_response.get("result") or []
         
         if not sell_orders or not buy_orders:
             return None, None
@@ -76,7 +76,7 @@ def get_my_open_orders(token):
     """Kullanıcının açık emirlerini çek"""
     try:
         # Açık alım emirleri
-        open_buys = requests.post(HE_API, json={
+        buy_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 10,
             "method": "find",
@@ -86,10 +86,12 @@ def get_my_open_orders(token):
                 "query": {"account": HIVE_USERNAME, "symbol": token},
                 "limit": 1000
             }
-        }, timeout=10).json().get("result", [])
+        }, timeout=10).json()
+        
+        open_buys = buy_response.get("result") or []
         
         # Açık satım emirleri
-        open_sells = requests.post(HE_API, json={
+        sell_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 11,
             "method": "find",
@@ -99,7 +101,9 @@ def get_my_open_orders(token):
                 "query": {"account": HIVE_USERNAME, "symbol": token},
                 "limit": 1000
             }
-        }, timeout=10).json().get("result", [])
+        }, timeout=10).json()
+        
+        open_sells = sell_response.get("result") or []
         
         return open_buys + open_sells
     except Exception as e:
@@ -180,7 +184,7 @@ def run_bot():
     log(f"Fiyat adımı (tick): {TICK_SIZE}", "INFO")
     log(f"Kontrol aralığı: {CHECK_INTERVAL} saniye", "INFO")
     log("=" * 60, "INFO")
-    log("️  SİMÜLASYON MODU - Gerçek emir koyulmuyor!", "WARNING")
+    log("⚠️  SİMÜLASYON MODU - Gerçek emir koyulmuyor!", "WARNING")
     log("=" * 60, "INFO")
     
     cycle = 0
@@ -201,11 +205,11 @@ def run_bot():
             best_ask, best_bid = get_order_book(TOKEN)
             
             if not best_ask or not best_bid:
-                log("️  Order book boş, bekleniyor...", "WARNING")
+                log("⚠️  Order book boş, bekleniyor...", "WARNING")
                 time.sleep(CHECK_INTERVAL)
                 continue
             
-            log(f"📊 Mevcut Order Book:", "INFO")
+            log(f" Mevcut Order Book:", "INFO")
             log(f"   Best ASK: {best_ask:.8f}", "INFO")
             log(f"   Best BID: {best_bid:.8f}", "INFO")
             log(f"   Spread: %{((best_ask - best_bid) / best_bid * 100):.2f}", "INFO")
@@ -220,7 +224,7 @@ def run_bot():
             
             # 5. SATIŞ EMRİ: Best ASK'ın altına koy
             sell_price = best_ask - TICK_SIZE
-            log(f" Satım emri: {sell_price:.8f} (ASK - {TICK_SIZE})", "INFO")
+            log(f"📉 Satım emri: {sell_price:.8f} (ASK - {TICK_SIZE})", "INFO")
             place_sell_order(TOKEN, sell_price, dec_quantity)
             
             orders_placed += 2
