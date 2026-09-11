@@ -20,9 +20,9 @@ jobs:
       - name: Run Bot
         env:
           HIVE_USERNAME: ${{ secrets.HIVE_USERNAME }}
-          HIVE_POSTING_KEY: ${{ secrets.HIVE_POSTING_KEY }}
+          HIVE_ACTIVE_KEY: ${{ secrets.HIVE_ACTIVE_KEY }} # ⚠️ DEĞİŞTİ
           TRADE_AMOUNT: ${{ secrets.TRADE_AMOUNT }}
           CHECK_INTERVAL: ${{ secrets.CHECK_INTERVAL }}
         run: |
-          echo "🚀 Market Making Bot başlatılıyor (GERÇEK İŞLEM)..."
+          echo "🚀 Market Making Bot başlatılıyor (ACTIVE KEY ile)..."
           python -u bot.py
