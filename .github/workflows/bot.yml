@@ -1,29 +1,31 @@
-name: DEC Market Making Bot
-
-on:
-  workflow_dispatch:
-
-jobs:
-  run-bot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      
-      - name: Install dependencies
-        run: pip install requests
-      
-      - name: Run Bot
-        env:
-          HIVE_USERNAME: ${{ secrets.HIVE_USERNAME }}
-          HIVE_POSTING_KEY: ${{ secrets.HIVE_POSTING_KEY }}
-          TRADE_AMOUNT: ${{ secrets.TRADE_AMOUNT }}
-          CHECK_INTERVAL: ${{ secrets.CHECK_INTERVAL }}
-          MIN_SPREAD: ${{ secrets.MIN_SPREAD }}
-        run: |
-          echo "🚀 Market Making Bot başlatılıyor..."
-          python -u bot.py
+🚀 Market Making Bot başlatılıyor (GERÇEK İŞLEM)...
+[2026-09-11 17:30:00] [INFO] ============================================================
+[2026-09-11 17:30:00] [INFO]  Hive Engine Top-of-Book Botu (GERÇEK İŞLEM)
+[2026-09-11 17:30:00] [INFO] Kullanıcı: ***
+[2026-09-11 17:30:00] [INFO] Token: DEC
+[2026-09-11 17:30:00] [INFO] İşlem miktarı: 0.1 HIVE
+[2026-09-11 17:30:00] [INFO] Fiyat adımı (tick): 1e-08
+[2026-09-11 17:30:00] [INFO] Kontrol aralığı: 30 saniye
+[2026-09-11 17:30:00] [INFO] ============================================================
+[2026-09-11 17:30:00] [WARNING] ⚠️  GERÇEK İŞLEM MODU - Gerçek emirler koyulacak!
+[2026-09-11 17:30:00] [INFO] ============================================================
+[2026-09-11 17:30:00] [INFO] 
+[2026-09-11 17:30:00] [INFO]  Döngü #1
+[2026-09-11 17:30:00] [INFO] 🧹 Eski emirler temizleniyor...
+[2026-09-11 17:30:01] [INFO]    İptal edilecek açık emir yok
+[2026-09-11 17:30:02] [INFO]  Mevcut Order Book:
+[2026-09-11 17:30:02] [INFO]    Best ASK: 0.00838419
+[2026-09-11 17:30:02] [INFO]    Best BID: 0.00831993
+[2026-09-11 17:30:02] [INFO]    Spread: %0.78
+[2026-09-11 17:30:02] [INFO] 
+[2026-09-11 17:30:02] [INFO] 📈 Alım emri: 0.00831994 (BID + 1e-08)
+[2026-09-11 17:30:02] [SUCCESS] 📈 ALIM EMRİ: 11.9362 DEC @ 0.00831994
+[2026-09-11 17:30:03] [SUCCESS]    ✅ Alım emri gönderildi
+[2026-09-11 17:30:03] [INFO] 📉 Satım emri: 0.00838418 (ASK - 1e-08)
+[2026-09-11 17:30:03] [SUCCESS] 📉 SATIM EMRİ: 11.9362 DEC @ 0.00838418
+[2026-09-11 17:30:04] [SUCCESS]    ✅ Satım emri gönderildi
+[2026-09-11 17:30:04] [INFO]    Beklenen kâr: 0.000767 HIVE
+[2026-09-11 17:30:04] [INFO]    Toplam koyulan emir: 2
+[2026-09-11 17:30:04] [INFO]    Toplam iptal edilen emir: 0
+[2026-09-11 17:30:04] [INFO] 
+[2026-09-11 17:30:04] [INFO] ⏳ 30 saniye bekleniyor...
