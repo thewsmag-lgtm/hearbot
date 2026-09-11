@@ -5,14 +5,14 @@ import json
 import requests
 from datetime import datetime
 from beem import Hive
-from beembase.operations import CustomJson
+from beembase.operations import Custom_json
 from beem.transactionbuilder import TransactionBuilder
 
 # --- AYARLAR ---
 HIVE_USERNAME = os.getenv("HIVE_USERNAME", "test_user")
 POSTING_KEY = os.getenv("HIVE_POSTING_KEY", "test_key")
 TOKEN = os.getenv("TOKEN", "DEC")
-TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "0.1"))  # TEST İÇİN 0.1 HIVE!
+TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "0.1"))
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "30"))
 TICK_SIZE = float(os.getenv("TICK_SIZE", "0.00000001"))
 
@@ -117,11 +117,11 @@ def send_custom_json(payload):
     try:
         hive = Hive(node=HIVE_NODE, keys=[POSTING_KEY])
         tx = TransactionBuilder(blockchain_instance=hive)
-        tx.appendOp(CustomJson(
+        tx.appendOp(Custom_json(
             required_auths=[],
             required_posting_auths=[HIVE_USERNAME],
             id="ssc-mainnet1",
-            json=json.dumps(payload)
+            json_data=json.dumps(payload)
         ))
         tx.appendWif(POSTING_KEY)
         tx.sign()
@@ -133,7 +133,7 @@ def send_custom_json(payload):
 
 def cancel_order(order_id):
     """Emir iptal et (GERÇEK)"""
-    log(f"   ️ Emir iptal ediliyor: {order_id}", "INFO")
+    log(f"   🗑️ Emir iptal ediliyor: {order_id}", "INFO")
     
     payload = {
         "contractName": "market",
@@ -166,14 +166,14 @@ def cancel_all_my_orders(token):
         if order_id:
             cancel_order(order_id)
             cancelled += 1
-            time.sleep(1)  # Rate limit için bekle
+            time.sleep(1)
     
     log(f"   ✅ {cancelled} emir iptal edildi", "SUCCESS")
     return cancelled
 
 def place_buy_order(token, price, quantity):
     """Alım emri koy (GERÇEK)"""
-    log(f" ALIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
+    log(f"📈 ALIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
     
     payload = {
         "contractName": "market",
@@ -252,7 +252,7 @@ def run_bot():
                 time.sleep(CHECK_INTERVAL)
                 continue
             
-            log(f"📊 Mevcut Order Book:", "INFO")
+            log(f" Mevcut Order Book:", "INFO")
             log(f"   Best ASK: {best_ask:.8f}", "INFO")
             log(f"   Best BID: {best_bid:.8f}", "INFO")
             log(f"   Spread: %{((best_ask - best_bid) / best_bid * 100):.2f}", "INFO")
