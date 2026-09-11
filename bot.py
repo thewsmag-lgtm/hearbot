@@ -4,17 +4,21 @@ import time
 import json
 import requests
 from datetime import datetime
+from beem import Hive
+from beembase.operations import CustomJson
+from beem.transactionbuilder import TransactionBuilder
 
 # --- AYARLAR ---
 HIVE_USERNAME = os.getenv("HIVE_USERNAME", "test_user")
 POSTING_KEY = os.getenv("HIVE_POSTING_KEY", "test_key")
 TOKEN = os.getenv("TOKEN", "DEC")
-TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "1"))
+TRADE_AMOUNT_HIVE = float(os.getenv("TRADE_AMOUNT", "0.1"))  # TEST İÇİN 0.1 HIVE!
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "30"))
 TICK_SIZE = float(os.getenv("TICK_SIZE", "0.00000001"))
 
 # Hive Engine API
 HE_API = "https://api.hive-engine.com/rpc/contracts"
+HIVE_NODE = "https://api.hive.blog"
 
 def log(message, level="INFO"):
     """Anlık log mesajı"""
@@ -75,7 +79,6 @@ def get_order_book(token):
 def get_my_open_orders(token):
     """Kullanıcının açık emirlerini çek"""
     try:
-        # Açık alım emirleri
         buy_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 10,
@@ -90,7 +93,6 @@ def get_my_open_orders(token):
         
         open_buys = buy_response.get("result") or []
         
-        # Açık satım emirleri
         sell_response = requests.post(HE_API, json={
             "jsonrpc": "2.0",
             "id": 11,
@@ -110,17 +112,43 @@ def get_my_open_orders(token):
         log(f"Açık emirler çekilemedi: {e}", "ERROR")
         return []
 
+def send_custom_json(payload):
+    """Hive Engine'e Custom JSON gönder"""
+    try:
+        hive = Hive(node=HIVE_NODE, keys=[POSTING_KEY])
+        tx = TransactionBuilder(blockchain_instance=hive)
+        tx.appendOp(CustomJson(
+            required_auths=[],
+            required_posting_auths=[HIVE_USERNAME],
+            id="ssc-mainnet1",
+            json=json.dumps(payload)
+        ))
+        tx.appendWif(POSTING_KEY)
+        tx.sign()
+        result = tx.broadcast()
+        return result
+    except Exception as e:
+        log(f"İşlem gönderilemedi: {e}", "ERROR")
+        return None
+
 def cancel_order(order_id):
-    """Emir iptal et (SİMÜLASYON)"""
-    log(f"   🗑️ Emir iptal ediliyor: {order_id}", "INFO")
-    # Gerçek işlem için:
-    # payload = {
-    #     "contractName": "market",
-    #     "contractAction": "cancel",
-    #     "contractPayload": {"id": str(order_id)}
-    # }
-    # send_custom_json(payload)
-    return True
+    """Emir iptal et (GERÇEK)"""
+    log(f"   ️ Emir iptal ediliyor: {order_id}", "INFO")
+    
+    payload = {
+        "contractName": "market",
+        "contractAction": "cancel",
+        "contractPayload": {"id": str(order_id)}
+    }
+    
+    result = send_custom_json(payload)
+    
+    if result:
+        log(f"   ✅ Emir iptal edildi", "SUCCESS")
+    else:
+        log(f"   ❌ Emir iptal edilemedi", "ERROR")
+    
+    return result
 
 def cancel_all_my_orders(token):
     """Tüm açık emirlerimi iptal et"""
@@ -138,53 +166,68 @@ def cancel_all_my_orders(token):
         if order_id:
             cancel_order(order_id)
             cancelled += 1
+            time.sleep(1)  # Rate limit için bekle
     
     log(f"   ✅ {cancelled} emir iptal edildi", "SUCCESS")
     return cancelled
 
 def place_buy_order(token, price, quantity):
-    """Alım emri koy (SİMÜLASYON)"""
-    log(f"📈 ALIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
-    # Gerçek işlem için:
-    # payload = {
-    #     "contractName": "market",
-    #     "contractAction": "buy",
-    #     "contractPayload": {
-    #         "symbol": token,
-    #         "quantity": f"{quantity:.8f}",
-    #         "price": f"{price:.8f}"
-    #     }
-    # }
-    # send_custom_json(payload)
-    return True
+    """Alım emri koy (GERÇEK)"""
+    log(f" ALIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
+    
+    payload = {
+        "contractName": "market",
+        "contractAction": "buy",
+        "contractPayload": {
+            "symbol": token,
+            "quantity": f"{quantity:.8f}",
+            "price": f"{price:.8f}"
+        }
+    }
+    
+    result = send_custom_json(payload)
+    
+    if result:
+        log(f"   ✅ Alım emri gönderildi", "SUCCESS")
+    else:
+        log(f"   ❌ Alım emri gönderilemedi", "ERROR")
+    
+    return result
 
 def place_sell_order(token, price, quantity):
-    """Satım emri koy (SİMÜLASYON)"""
+    """Satım emri koy (GERÇEK)"""
     log(f"📉 SATIM EMRİ: {quantity:.4f} {token} @ {price:.8f}", "SUCCESS")
-    # Gerçek işlem için:
-    # payload = {
-    #     "contractName": "market",
-    #     "contractAction": "sell",
-    #     "contractPayload": {
-    #         "symbol": token,
-    #         "quantity": f"{quantity:.8f}",
-    #         "price": f"{price:.8f}"
-    #     }
-    # }
-    # send_custom_json(payload)
-    return True
+    
+    payload = {
+        "contractName": "market",
+        "contractAction": "sell",
+        "contractPayload": {
+            "symbol": token,
+            "quantity": f"{quantity:.8f}",
+            "price": f"{price:.8f}"
+        }
+    }
+    
+    result = send_custom_json(payload)
+    
+    if result:
+        log(f"   ✅ Satım emri gönderildi", "SUCCESS")
+    else:
+        log(f"   ❌ Satım emri gönderilemedi", "ERROR")
+    
+    return result
 
 def run_bot():
     """Ana bot döngüsü"""
     log("=" * 60, "INFO")
-    log("🤖 Hive Engine Top-of-Book Botu (Emir İptalli)", "INFO")
+    log("🤖 Hive Engine Top-of-Book Botu (GERÇEK İŞLEM)", "INFO")
     log(f"Kullanıcı: {HIVE_USERNAME}", "INFO")
     log(f"Token: {TOKEN}", "INFO")
     log(f"İşlem miktarı: {TRADE_AMOUNT_HIVE} HIVE", "INFO")
     log(f"Fiyat adımı (tick): {TICK_SIZE}", "INFO")
     log(f"Kontrol aralığı: {CHECK_INTERVAL} saniye", "INFO")
     log("=" * 60, "INFO")
-    log("⚠️  SİMÜLASYON MODU - Gerçek emir koyulmuyor!", "WARNING")
+    log("⚠️  GERÇEK İŞLEM MODU - Gerçek emirler koyulacak!", "WARNING")
     log("=" * 60, "INFO")
     
     cycle = 0
@@ -209,7 +252,7 @@ def run_bot():
                 time.sleep(CHECK_INTERVAL)
                 continue
             
-            log(f" Mevcut Order Book:", "INFO")
+            log(f"📊 Mevcut Order Book:", "INFO")
             log(f"   Best ASK: {best_ask:.8f}", "INFO")
             log(f"   Best BID: {best_bid:.8f}", "INFO")
             log(f"   Spread: %{((best_ask - best_bid) / best_bid * 100):.2f}", "INFO")
